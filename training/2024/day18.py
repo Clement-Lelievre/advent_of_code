@@ -1,6 +1,7 @@
 import numpy as np
 from collections import deque
 from typing import Generator
+import time
 
 example = """5,4
 4,2
@@ -3525,20 +3526,14 @@ def solve_p1(inp: str, end_pos: tuple = (70, 70), nb_bytes: int = 1_024) -> int:
         seen_pos.add(curr_pos)
         for offset in (-1, 0), (1, 0), (0, 1), (0, -1):
             new_pos = curr_pos[0] + offset[0], curr_pos[1] + offset[1]
-            if (
-                0 <= new_pos[0] < nb_rows
-                and 0 <= new_pos[1] < nb_cols
-                and grid[new_pos] == "."
-            ):
+            if 0 <= new_pos[0] < nb_rows and 0 <= new_pos[1] < nb_cols and grid[new_pos] == ".":
                 queue.append((new_pos, curr_score + 1))
     print(current_best_score)
     return current_best_score
 
 
 # part 2
-def make_grids(
-    inp: str, start_nb_bytes: int = 1_024
-) -> Generator[np.ndarray, None, None]:
+def make_grids(inp: str, start_nb_bytes: int = 1_024) -> Generator[np.ndarray, None, None]:
     coords = [tuple(map(int, coord.split(","))) for coord in inp.strip().splitlines()]
     max_r, max_c = max(coord[1] for coord in coords), max(coord[0] for coord in coords)
     grid = np.zeros((max_r + 1, max_c + 1), dtype=str)
@@ -3572,11 +3567,7 @@ def solve_from_pos(grid: np.ndarray, end_pos: tuple[int, int]) -> float:
         seen_pos.add(curr_pos)
         for offset in (-1, 0), (1, 0), (0, 1), (0, -1):
             new_pos = curr_pos[0] + offset[0], curr_pos[1] + offset[1]
-            if (
-                0 <= new_pos[0] < nb_rows
-                and 0 <= new_pos[1] < nb_cols
-                and grid[new_pos] == "."
-            ):
+            if 0 <= new_pos[0] < nb_rows and 0 <= new_pos[1] < nb_cols and grid[new_pos] == ".":
                 queue.append((new_pos, curr_score + 1))
 
     return current_best_score
@@ -3584,13 +3575,46 @@ def solve_from_pos(grid: np.ndarray, end_pos: tuple[int, int]) -> float:
 
 # the naive approach would be to iterate on my part1 algo, but will it scale? Let's see, and if not I'll have to come up with something smarter
 def solve_p2(inp: str, end_pos: tuple = (70, 70), start_nb_bytes: int = 1024):
+    starttime = time.time()
     grids = make_grids(inp, start_nb_bytes)
     counter = start_nb_bytes
     while solve_from_pos(next(grids), end_pos=end_pos) < float("inf"):
         counter += 1
     ans = inp.strip().splitlines()[counter]
-    print(ans)
+
+    print(f"{ans} ({time.time()-starttime}s)")
     return ans
+
+
+# it does scale! it is in linear time though, let's compare it to a binary search (log time)
+## extra: optim of part 2
+def make_grid(coords: list, nb_bytes: int) -> np.ndarray:
+    max_r, max_c = max(coord[1] for coord in coords), max(coord[0] for coord in coords)
+    grid = np.full((max_r + 1, max_c + 1), ".")
+    for c, r in coords[
+        :nb_bytes
+    ]:  # possible further optim: start from the grid filled with the first 1024 bytes
+        grid[r, c] = "#"
+    return grid
+
+
+def solve_p2_optim(inp: str, end_pos: tuple = (70, 70), start_nb_bytes: int = 1024):
+    starttime = time.time()
+    coords = [tuple(map(int, coord.split(","))) for coord in inp.strip().splitlines()]
+    good, bad = start_nb_bytes, len(coords) - 1
+    cursor = good + (bad - good) // 2
+    while bad - good > 1:
+        print(good, cursor, bad)
+        grid = make_grid(coords, cursor)
+        has_path = solve_from_pos(grid, end_pos=end_pos) < float("inf")
+        if has_path:
+            good = cursor
+        else:
+            bad = cursor
+        assert good <= cursor <= bad
+        cursor = good + (bad - good) // 2
+    ans = coords[cursor]
+    print(f"{ans} ({time.time()-starttime}s)")
 
 
 if __name__ == "__main__":
@@ -3599,4 +3623,7 @@ if __name__ == "__main__":
     # solve_p1(actual)
 
     # solve_p2(example_full, end_pos=(6,6), start_nb_bytes=12)
-    solve_p2(actual, end_pos=(70, 70), start_nb_bytes=1024)
+    solve_p2(actual, end_pos=(70, 70), start_nb_bytes=1024)  # (56,29) (5.4 sec)
+    solve_p2_optim(
+        actual, end_pos=(70, 70), start_nb_bytes=1024
+    )  # (56, 29) (0.011620044708251953s) in eleven steps! => is over 500 times faster!
