@@ -208,17 +208,48 @@ def solve_from_pos(
     start_pos: tuple[int, int],
     end_pos: tuple[int, int],
     current_best_score: int | float,
+    reference_times: dict[tuple[int, int], int],
+    is_reference_run: bool,
+    picoseconds_delta: int,
+    wall_coord: tuple[int, int],
 ) -> int | float:
     nb_rows, nb_cols = grid.shape
     curr_score = 0
     queue: deque = deque([])
-    queue.append((start_pos, curr_score))
+    has_cheated = False
+    queue.append((start_pos, curr_score, has_cheated))
     seen_pos = set()
 
     while queue:
-        curr_pos, curr_score = queue.popleft()
+        curr_pos, curr_score, has_cheated = queue.popleft()
+        if curr_pos == wall_coord:
+            has_cheated = True
         if curr_pos in seen_pos:  # seen pos during this specific grid solving
             continue
+        if (
+            is_reference_run is True
+            and reference_times.get(curr_pos, float("inf")) > curr_score
+        ):
+            reference_times[curr_pos] = (
+                curr_score  # record the reference time to get to `curr_pos`
+            )
+        # note: the 2 early exits that follow allowed to cut the run time from ~1'30'' to ~1'00''
+        if (
+            is_reference_run is False
+            and reference_times.get(curr_pos, 0) - curr_score >= picoseconds_delta
+        ):
+            return float(
+                "-inf"
+            )  # here we can already return, knowing that this path saves >= 100 picoseconds
+        if (
+            has_cheated
+            and reference_times.get(curr_pos, float("inf")) - curr_score
+            < picoseconds_delta
+        ):
+            return float(
+                "inf"
+            )  # early return as despite cheating, won't be able to beat ref run by at least 100 picoseconds
+        # and therefore should be counted
         if curr_score >= current_best_score:
             seen_pos.add(curr_pos)
             continue
@@ -234,18 +265,23 @@ def solve_from_pos(
                 and 0 <= new_pos[1] < nb_cols
                 and grid[new_pos] == "."
             ):
-                queue.append((new_pos, curr_score + 1))
-
+                queue.append((new_pos, curr_score + 1, has_cheated))
+    # print(reference_times)
     return current_best_score
 
 
 def solve_p1(inp: str, picoseconds_delta: int) -> int:
     grid, start_pos, end_pos, walls = make_grid_get_data(inp)
+    reference_times: dict[tuple, int] = {}
     reference_time = solve_from_pos(
         grid,
         start_pos,
         end_pos,
         current_best_score=float("inf"),
+        reference_times=reference_times,
+        is_reference_run=True,
+        picoseconds_delta=picoseconds_delta,
+        wall_coord=(-1, -1),  # dummy value as there's no wall in the ref run
     )
     assert isinstance(reference_time, int)
     print(f"{reference_time=} picoseconds")
@@ -255,9 +291,13 @@ def solve_p1(inp: str, picoseconds_delta: int) -> int:
         grid[wall] = "."
         new_time = solve_from_pos(
             grid,
-            start_pos,
+            start_pos, # to speed things up I'd like to start at the wall that was made a ., but this'd need more work
             end_pos,
             current_best_score=reference_time - picoseconds_delta + 1,
+            reference_times=reference_times,
+            is_reference_run=False,
+            picoseconds_delta=picoseconds_delta,
+            wall_coord=wall,
         )
         if new_time <= reference_time - picoseconds_delta:
             ans += 1
@@ -268,4 +308,4 @@ def solve_p1(inp: str, picoseconds_delta: int) -> int:
 
 if __name__ == "__main__":
     assert solve_p1(example, picoseconds_delta=2) == 44
-    solve_p1(actual, picoseconds_delta=100)  # ~1'30'' this is slow, can I do better?
+    solve_p1(actual, picoseconds_delta=100)  # ~1 minute: this is slow, can I do better?
