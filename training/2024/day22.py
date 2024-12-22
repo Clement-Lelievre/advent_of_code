@@ -1,3 +1,6 @@
+from collections import defaultdict
+from typing import Generator
+
 example = """1
 10
 100
@@ -2085,6 +2088,11 @@ actual = """752821
 1301536
 """
 
+example2 = """1
+2
+3
+2024"""
+
 
 def mix(secret: int, other: int) -> int:
     return secret ^ other
@@ -2094,7 +2102,7 @@ def prune(secret: int) -> int:
     return secret % 16_777_216
 
 
-def rng(init_nb: int, nb_times: int) -> int:
+def rng(init_nb: int, nb_times: int) -> Generator[int, None, None]:
     """random number generator
 
     Args:
@@ -2109,15 +2117,54 @@ def rng(init_nb: int, nb_times: int) -> int:
         secret = prune(mix(secret, secret * 64))
         secret = prune(mix(secret, int(secret / 32)))
         secret = prune(mix(secret, secret * 2048))
+        yield secret
+
+
+def two_thousandth(init_nb: int) -> int:
+    rngen = rng(init_nb, 2_000)
+    for _ in range(2000):
+        secret = next(rngen)
     return secret
 
 
-def solve_p1(inp: str, nb_times: int = 2000) -> int:
-    ans = sum(rng(int(nb), nb_times) for nb in inp.strip().splitlines())
+def solve_p1(inp: str) -> int:
+    ans = sum(two_thousandth(int(nb)) for nb in inp.strip().splitlines())
     print(f"Part 1: {ans}")
     return ans
 
 
+# part 2
+def solve_p2(inp: str) -> int:
+    all_prices = defaultdict(int)
+    init_prices = map(int, inp.strip().splitlines())
+    for init_price in init_prices:
+        bananas_one_buyer(init_price, all_prices)
+    ans = max(all_prices.values())
+    print(f"Part 2: {ans}")
+    return ans
+
+
+def bananas_one_buyer(init: int, all_price_data: dict) -> None:
+    """Gets in a dict how many bananas we can make for each sequence, from
+    a single buyer's initial number
+
+    Args:
+        init (int): the initial secret number
+    """
+    seen = set()
+    prices = [init % 10] + [price % 10 for price in rng(init, 2000)]
+    for i in range(4, len(prices)):
+        changes = tuple(
+            prices[i + 1] - prices[i] for i in range(i - 4, i)
+        )  # need hashable obj to be a dict key
+        if changes in seen:
+            continue
+        all_price_data[changes] += prices[i]
+        seen.add(changes)
+
+
 if __name__ == "__main__":
-    assert solve_p1(example) == 37_327_623
-    solve_p1(actual)
+    # assert solve_p1(example) == 37_327_623
+    # solve_p1(actual)
+    assert solve_p2(example2) == 23
+    solve_p2(actual)
