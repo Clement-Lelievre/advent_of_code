@@ -166,7 +166,7 @@ actual = """####################################################################
 
 def make_grid_get_data(
     inp: str,
-) -> tuple[np.ndarray, tuple[int, int], tuple[int, int], list]:
+) -> tuple[np.ndarray, tuple[int, int], tuple[int, int], list[int, int]]:
     """Builds the initial grid and return start_pos, end_pos, and the locations of hash tags"""
     grid = np.array([list(line) for line in inp.strip().splitlines()], dtype=str)
     nb_rows, nb_cols = grid.shape
@@ -270,6 +270,46 @@ def solve_from_pos(
     return current_best_score
 
 
+def get_best_path(
+    grid: np.ndarray,
+    start_pos: tuple[int, int],
+    end_pos: tuple[int, int],
+) -> list[tuple[int, int]]:
+    nb_rows, nb_cols = grid.shape
+    curr_score = 0
+    queue: deque = deque([])
+    queue.append(([start_pos], curr_score))
+    seen_pos = set()
+    current_best_score = float("inf")
+    best_path = []
+    while queue:
+        curr_path, curr_score = queue.popleft()
+        curr_pos = curr_path[-1]
+        if curr_pos in seen_pos:  # seen pos during this specific grid solving
+            continue
+
+        # and therefore should be counted
+        if curr_score >= current_best_score:
+            seen_pos.add(curr_pos)
+            continue
+        if curr_pos == end_pos and curr_score < current_best_score:
+            current_best_score = curr_score
+            best_path = curr_path
+            # print(f"new best: {current_lowest_score}")
+            continue
+        seen_pos.add(curr_pos)
+        for offset in (-1, 0), (1, 0), (0, 1), (0, -1):
+            new_pos = curr_pos[0] + offset[0], curr_pos[1] + offset[1]
+            if (
+                0 <= new_pos[0] < nb_rows
+                and 0 <= new_pos[1] < nb_cols
+                and grid[new_pos] == "."
+            ):
+                queue.append((curr_path + [new_pos], curr_score + 1))
+    # print(reference_times)
+    return best_path
+
+
 def solve_p1(inp: str, picoseconds_delta: int) -> int:
     grid, start_pos, end_pos, walls = make_grid_get_data(inp)
     reference_times: dict[tuple, int] = {}
@@ -291,7 +331,89 @@ def solve_p1(inp: str, picoseconds_delta: int) -> int:
         grid[wall] = "."
         new_time = solve_from_pos(
             grid,
-            start_pos, # to speed things up I'd like to start at the wall that was made a ., but this'd need more work
+            start_pos,  # to speed things up I'd like to start at the wall that was made a ., but this'd need more work
+            end_pos,
+            current_best_score=reference_time - picoseconds_delta + 1,
+            reference_times=reference_times,
+            is_reference_run=False,
+            picoseconds_delta=picoseconds_delta,
+            wall_coord=wall,
+        )
+        if new_time <= reference_time - picoseconds_delta:
+            ans += 1
+        grid[wall] = "#"
+    print(f"Part 1: {ans}")
+    return ans
+
+
+def solve_p1_optimised(inp: str, picoseconds_delta: int) -> int:
+    grid, start_pos, end_pos, walls = make_grid_get_data(inp)
+    print(f"{len(walls)} walls before")
+    best_path = get_best_path(grid, start_pos, end_pos)
+    nb_rows, nb_cols = grid.shape
+    # optim: filter the hashtags (ie walls) on only those that actually are shortcuts
+    candidate_walls = set()
+    for coord_ind, (x, y) in enumerate(best_path):
+        neigh = (x + 1, y)
+        if (
+            neigh not in candidate_walls
+            and 0 <= x + 2 < nb_rows
+            and grid[neigh] == "#"
+            and (x + 2, y) in best_path
+            and best_path.index((x + 2, y)) > coord_ind
+        ):  # at time 2 of the cheat we need to fall back on a dot
+            candidate_walls.add(neigh)
+
+        neigh = (x - 1, y)
+        if (
+            neigh not in candidate_walls
+            and 0 <= x - 2 < nb_rows
+            and grid[neigh] == "#"
+            and (x - 2, y) in best_path
+            and best_path.index((x - 2, y)) > coord_ind
+        ):  # at time 2 of the cheat we need to fall back on a dot
+            candidate_walls.add(neigh)
+        neigh = (x, y - 1)
+        if (
+            neigh not in candidate_walls
+            and 0 <= y - 2 < nb_cols
+            and grid[neigh] == "#"
+            and (x, y - 2) in best_path
+            and best_path.index((x, y - 2)) > coord_ind
+        ):  # at time 2 of the cheat we need to fall back on a dot
+            candidate_walls.add(neigh)
+        neigh = (x, y + 1)
+        if (
+            neigh not in candidate_walls
+            and 0 <= y + 2 < nb_cols
+            and grid[neigh] == "#"
+            and (x, y + 2) in best_path
+            and best_path.index((x, y + 2)) > coord_ind
+        ):  # at time 2 of the cheat we need to fall back on a dot
+            candidate_walls.add(neigh)
+
+    print(f"{len(candidate_walls)} walls after optim")
+
+    reference_times: dict[tuple, int] = {}
+    reference_time = solve_from_pos(
+        grid,
+        start_pos,
+        end_pos,
+        current_best_score=float("inf"),
+        reference_times=reference_times,
+        is_reference_run=True,
+        picoseconds_delta=picoseconds_delta,
+        wall_coord=(-1, -1),  # dummy value as there's no wall in the ref run
+    )
+    assert isinstance(reference_time, int)
+    print(f"{reference_time=} picoseconds")
+    ans = 0
+    for wall in tqdm(candidate_walls):
+        assert grid[wall] == "#"
+        grid[wall] = "."
+        new_time = solve_from_pos(
+            grid,
+            start_pos,  # to speed things up I'd like to start at the wall that was made a ., but this'd need more work
             end_pos,
             current_best_score=reference_time - picoseconds_delta + 1,
             reference_times=reference_times,
@@ -307,5 +429,6 @@ def solve_p1(inp: str, picoseconds_delta: int) -> int:
 
 
 if __name__ == "__main__":
-    assert solve_p1(example, picoseconds_delta=2) == 44
-    solve_p1(actual, picoseconds_delta=100)  # ~1 minute: this is slow, can I do better?
+    # assert solve_p1(example, picoseconds_delta=2) == 44
+    # solve_p1(actual, picoseconds_delta=100)  # ~1 minute: this is slow, can I do better?
+    assert solve_p1_optimised(actual, picoseconds_delta=100) == 1317
