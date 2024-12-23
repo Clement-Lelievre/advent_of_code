@@ -3444,26 +3444,31 @@ def solve_p1(inp: str) -> int:
 
 def solve_p2(inp: str) -> str:
     lines = inp.strip().splitlines()
-    players: defaultdict[str, set[str]] = defaultdict(set)
+    players = defaultdict(set)
     for line in lines:
         p1, p2 = line.split("-")
         players[p1].add(p2)
         players[p2].add(p1)
+
     largest_size = 1
     password = ""
-    for player, others in players.items():
-        curr_connected_group: set[str] = {
-            player
-        } | others.copy()  # no this is wrong, make a drawing to see it
 
-        for other in others:
-            # print(f"{other=}")
-            curr_connected_group &= players[other] | {other}
-            # print(f"{curr_connected_group=}")
-        if len(curr_connected_group) > largest_size:
-            password = ",".join(sorted(curr_connected_group))
-            largest_size = len(curr_connected_group)
-
+    for player, group in players.items():
+        for group_size in range(
+            len(group), largest_size, -1
+        ):  # I had an intuition going from large to small would be faster
+            for player_subset in combinations(
+                group, group_size
+            ):  # that'll be max 2^14 iterations (I found this idea on reddit)
+                player_subset = set(player_subset) | {player}
+                if all(
+                    players[p].issuperset(player_subset - {p}) for p in player_subset
+                ):
+                    password = ",".join(sorted(player_subset))
+                    largest_size = group_size
+                    break
+            else:
+                continue
     print(f"Part 2: {password}")
     return password
 
@@ -3471,5 +3476,5 @@ def solve_p2(inp: str) -> str:
 if __name__ == "__main__":
     # assert solve_p1(example) == 7
     # solve_p1(actual)
-    assert solve_p2(example) == "co,de,ka,ta"  # part 2 does not work for now
+    assert solve_p2(example) == "co,de,ka,ta"
     solve_p2(actual)
