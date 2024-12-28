@@ -597,8 +597,8 @@ def solve_p2(input: str, shape: tuple[int, int]) -> None:
     assert sum(map(len, data.values())) == len(
         [l for l in input.splitlines() if l.strip()]
     )
-    tree_step = move_p2(data, shape)
-
+    #tree_step = move_p2(data, shape)
+    tree_step = find_minimal_mean_dist_to_centroid(data, shape)
     print(f"{tree_step=}")
 
 
@@ -722,6 +722,61 @@ def check_p1_with_p2_algo(input: str, shape: tuple[int, int], nb_seconds: int) -
     print(ans)
     return ans
 
+def find_minimal_mean_dist_to_centroid(
+    data: dict[tuple[int, int], list[tuple[int, int]]],
+    shape: tuple[int, int],
+) -> int:
+    # change inplace the grid, simulate moves for `nb_seconds`
+
+    grid = np.zeros(shape, dtype=int)
+    for pos, velocities in data.items():
+        grid[pos] += len(velocities)
+    r, c = grid.shape
+    min_mean_dist = float('inf')
+    for step_nb in range(10_000):
+        new_data = defaultdict(list)
+        for curr_pos, velocities in data.items():
+            for velocity in velocities:
+                # remove robot from grid and data dict
+                grid[curr_pos] -= 1
+                # data[curr_pos] =data[curr_pos][1:] if len(data[curr_pos])>1 else [] # ensure the correct index is used, in case of several identical velocities on this location
+                # add new robot location on grid and data dict
+                new_pos = (curr_pos[0] + velocity[0]) % r, (
+                    curr_pos[1] + velocity[1]
+                ) % c  # compute robot destination square
+                grid[new_pos] += 1  # record the new robot location
+                new_data[new_pos].append(velocity)
+
+        data = new_data
+        if (new := mean_dist_to_centroid(grid)) < min_mean_dist:
+            print(f"new min mean dist to centroid at step {step_nb}")
+            tree_step = step_nb
+            min_mean_dist = new
+            if step_nb > 8000:
+                save_grid(grid, step_nb)
+            
+        if step_nb==8179:
+            save_grid(grid, 8179)
+        
+        # print(f"{step_nb=}",grid, sep='\n')
+    return tree_step
+
+def mean_dist_to_centroid(grid: np.ndarray) -> float:
+    # Ensure all values in the grid are either 0 or 1
+    grid=grid.copy()
+    grid[grid > 1] = 1
+    
+    # Get the coordinates of all points in the grid
+    points = np.argwhere(grid == 1)
+    # Calculate the centroid of the points
+    centroid = points.mean(axis=0)
+    # Calculate the distance of each point to the centroid
+    distances = np.abs(points - centroid)
+    
+    # Return the mean distance
+    mean_ = distances.mean()
+    return mean_
+
 
 if __name__ == "__main__":
     # ans_example = solve_p1(example_input, shape=(7, 11), nb_seconds=100)
@@ -731,3 +786,4 @@ if __name__ == "__main__":
     # assert check_p1_with_p2_algo(example_input, (7, 11), 100) == 12
     # assert check_p1_with_p2_algo(actual_input, (103, 101), 100) == 232253028
     solve_p2(actual_input, (103, 101))  # I was a bit lucky, looking for a segment full of robots, first 5 of them, then 6.. up to 8 which solved it
+    
