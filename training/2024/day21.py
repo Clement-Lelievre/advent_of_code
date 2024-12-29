@@ -1,16 +1,19 @@
 """https://adventofcode.com/2024/day/21"""
 
-from itertools import permutations
+from itertools import permutations, product
+from typing import Generator
 
 actual_input = ["140A", "180A", "176A", "805A", "638A"]
 
 # the problem is estimated "hardcore" on both parts by Le wagon x AoC's Slackbot Djikstra
 
-# notes:
+# personal notes:
 
 # beware mixing up A from the numeric keypad and A on directional keypads
 # avoid the empty gap on keypads
 # robots start with their arm pointed at A (do they reset their arm position for all new codes ie go back to A if they aren't already pointed at A?) yes because they finish pressing A
+# A on the numeric keypad means typing an actual A in the code, while in the directional keypad it means pressing a button
+
 
 # the numeric keypad
 # +---+---+---+
@@ -102,6 +105,33 @@ directional_keypad_moves: dict[tuple[tuple[int, int], tuple[int, int]], str] = {
 }
 
 
+def optimized_paths_generator(path_: str) -> Generator[str, None, None]:
+    """Yields all the optimized paths from `path`.
+    This is essentially grouping charcaters (to avoid back and forth trips) and trying all possibilities of orders.
+    For example, a stair-shaped path from bottom right to upper left cannot be optimized because the upper level'd get wasted back and forth trips
+    Instead, we leverage the fact of pointing at a button and being able to press it several times in a row.
+
+    Args:
+        path (str): a path such as '<^>vvAv...'
+
+    Yields:
+        Generator[str, None, None]: the optimized paths
+    """
+    intermediate_routes = path_.split("A")
+    p = []
+    for elem in intermediate_routes:
+        if not elem:
+            continue  # the trailing empty strings added by python
+        e = "".join(sorted(elem))
+        p.append((e, e[::-1]))
+
+    for path_data in product(*p):
+        # make sure this path does not go over the gap area of the keypad
+        # only up and left could get the robot's arm pointing at the forbidden gap area because the gap is at (0,0)
+        candidate_path = "A".join(path_data) + "A"
+        yield candidate_path
+
+
 def code_to_seq(code_: str) -> str:
     """From a code, get the sequence to give to the robot handling the numeric keypad"""
     current_pos = numeric_keypad["A"]
@@ -123,29 +153,42 @@ def seq_to_seq(sequence_: str) -> str:
     # group identical consecutive characters, so as to get the shortest path. for example, it's shorter to perform the route ^^> than ^>^
     # but I can't just sort the character grouped between 'A's, I need to compute the order that yields the minimum distance route
 
-    smart_sequence = "A".join(
-        "".join(sorted(s)) for s in sequence_.split("A")
-    )  # to be improved, see the below TODO
+    # smart_sequence = "A".join(
+    #     "".join(sorted(s)) for s in sequence_.split("A")
+    # )  # to be improved, see the below TODO
     # TO DO: yield all smart sequences, because we don't which one will produce the shortest path at the highest level
+    min_path_len = float("inf")
+    best = None
+    FORBIDDEN_SQUARE = (0,0) # the gap area on the directional keypad
+    for smart_sequence in optimized_paths_generator(sequence_):
+        seq = ""
+        for char in smart_sequence:
+            dest = directional_keypad[char]
+            if current_pos != dest:
+                seq += directional_keypad_moves[(current_pos, dest)]
+                current_pos = dest
+            seq += "A"
+            if len(seq) > min_path_len:
+                break
+            if current_pos == FORBIDDEN_SQUARE:
+                print("FORBIDDEN")
+                break
+        else:
+            if (
+                len(seq) < min_path_len
+            ):  # what if there are ties ? will I need to try out all tied paths?
+                min_path_len = len(seq)
+                best = seq
+                print(f"new best: {min_path_len=}")
+    assert best is not None
+    return best
 
-    seq = ""
-    # print(f"processing {sequence_=}")
-    for char in smart_sequence:
-        dest = directional_keypad[char]
-        if current_pos != dest:
-            seq += directional_keypad_moves[(current_pos, dest)]
-            current_pos = dest
-        seq += "A"
-        # print(f"processed {char=}, current seq: {seq}")
-    # print("DONE", end="\n\n")
-    return seq
 
-
-def solve_p1(codes: list[str]) -> int:
+def solve_p1(codes: list[str], nb_levels: int = 2) -> int:
     ans = 0
     for code_ in codes:
         sequence_ = code_to_seq(code_)
-        for _ in range(2):
+        for _ in range(nb_levels):
             sequence_ = seq_to_seq(sequence_)
         ans += complexity(sequence_, code_)
     print(f"Part 1: {ans}")
@@ -157,6 +200,13 @@ def complexity(sequence_: str, code_: str) -> int:
 
 
 if __name__ == "__main__":
+    assert list(optimized_paths_generator("<>A^^>>>A")) == [
+        "<>A>>>^^A",
+        "<>A^^>>>A",
+        "><A>>>^^A",
+        "><A^^>>>A",
+    ]
+
     test_complexities = {
         "029A": [
             "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A",
@@ -185,8 +235,8 @@ if __name__ == "__main__":
     assert numeric_keypad_moves[((3, 2), (0, 2))] == "^^^"
     assert code_to_seq("029A") in ("<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA")
 
-    # testing first call of seq_to_seq
-    # assert seq_to_seq("<A") == "<v<A>^>A"
+    #  testing first call of seq_to_seq
+    assert seq_to_seq("<A") == "<v<A>^>A"
     for numeric_pad_seq in ("<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"):
         actual_seq = seq_to_seq(numeric_pad_seq)
         actual_seq = "A".join("".join(sorted(s)) for s in actual_seq.split("A"))
@@ -198,12 +248,13 @@ if __name__ == "__main__":
     # testing 2nd call of seq_to_seq
     input_seq = "v<<A>>^A<A>AvA<^AA>A<vAAA>^A"
     actual = seq_to_seq(input_seq)
-    actual = "A".join("".join(sorted(s)) for s in actual.split("A"))
+    #actual = "A".join("".join(sorted(s)) for s in actual.split("A"))
     expected = "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A"
-    expected = "A".join("".join(sorted(s)) for s in expected.split("A"))
-    assert len(actual) == len(expected)
-    # if actual!=expected:
-    #     print(actual, expected, sep='\n');exit()
+    #expected = "A".join("".join(sorted(s)) for s in expected.split("A"))
+    # assert len(actual) == len(expected)
+    if len(actual) != len(expected):
+        print(actual, expected, sep="\n")
+        exit()
 
     # testing composed calls
     codes_full_seqs = {
@@ -227,3 +278,11 @@ if __name__ == "__main__":
     assert solve_p1(test_complexities.keys()) == 126384
 
     solve_p1(actual_input)
+
+#     +---+---+
+#     | ^ | A |
+# +---+---+---+
+# | < | v | > |
+# +---+---+---+
+# mine: <v<AA>A^>AvAA<^A>A<v<A>^>AvA^A<vA^>A<v<A>^A>AvA^A<v<A>A^>AvA<^A>A
+# expected: <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
