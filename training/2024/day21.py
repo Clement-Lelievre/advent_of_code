@@ -159,7 +159,7 @@ def seq_to_seq(sequence_: str) -> str:
     # TO DO: yield all smart sequences, because we don't which one will produce the shortest path at the highest level
     min_path_len = float("inf")
     best = None
-    FORBIDDEN_SQUARE = (0,0) # the gap area on the directional keypad
+    FORBIDDEN_SQUARE = (0, 0)  # the gap area on the directional keypad
     for smart_sequence in optimized_paths_generator(sequence_):
         seq = ""
         for char in smart_sequence:
@@ -248,9 +248,9 @@ if __name__ == "__main__":
     # testing 2nd call of seq_to_seq
     input_seq = "v<<A>>^A<A>AvA<^AA>A<vAAA>^A"
     actual = seq_to_seq(input_seq)
-    #actual = "A".join("".join(sorted(s)) for s in actual.split("A"))
+    # actual = "A".join("".join(sorted(s)) for s in actual.split("A"))
     expected = "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A"
-    #expected = "A".join("".join(sorted(s)) for s in expected.split("A"))
+    # expected = "A".join("".join(sorted(s)) for s in expected.split("A"))
     # assert len(actual) == len(expected)
     if len(actual) != len(expected):
         print(actual, expected, sep="\n")
@@ -284,5 +284,5 @@ if __name__ == "__main__":
 # +---+---+---+
 # | < | v | > |
 # +---+---+---+
-# mine: <v<AA>A^>AvAA<^A>A<v<A>^>AvA^A<vA^>A<v<A>^A>AvA^A<v<A>A^>AvA<^A>A
+# mine:     <v<AA>A^>AvAA<^A>A<v<A>^>AvA^A<vA^>A<v<A>^A>AvA^A<v<A>A^>AvA<^A>A
 # expected: <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
