@@ -1,3 +1,6 @@
+from itertools import combinations
+from tqdm import tqdm
+
 example_small = """x00: 1
 x01: 1
 x02: 1
@@ -382,6 +385,26 @@ wkb OR bfn -> hbd
 tpv OR dgt -> bbg
 """
 
+example_p2 = """x00: 0
+x01: 1
+x02: 0
+x03: 1
+x04: 0
+x05: 1
+y00: 0
+y01: 0
+y02: 1
+y03: 1
+y04: 0
+y05: 1
+
+x00 AND y00 -> z05
+x01 AND y01 -> z02
+x02 AND y02 -> z01
+x03 AND y03 -> z03
+x04 AND y04 -> z04
+x05 AND y05 -> z00"""
+
 
 def solve_p1(inp: str) -> int:
     wires: dict[str, int] = {}
@@ -435,9 +458,114 @@ def solve_p1(inp: str) -> int:
     return ans
 
 
+# part 2
+# first approach: brute force the possible permutations and re-use part 1
+
+def solve_p2(inp: str, op) -> str:
+    wires_: dict[str, int] = {}
+    gates_: dict[str, int | str] = {}
+    for line in inp.strip().splitlines():
+        if "->" in line:
+            gate_op, gate_name = line.split(" -> ")
+            gates_[gate_name.strip()] = gate_op.strip()
+        elif ":" in line:
+            wire_name, wire_val = line.split(": ")
+            wires_[wire_name.strip()] = int(wire_val.strip())
+
+    def recurse_compute_op(gate_name: str, gates_:dict, wires_:dict) -> int:
+        gate_op: str = gates_[gate_name]
+        wire_one, op, wire_two = gate_op.split()
+        op = (
+            int.__and__
+            if op == "AND"
+            else (
+                int.__xor__ if op == "XOR" else int.__or__
+            )  # alternative ways could be clearer, such as import operator; operator.xor(a,b) etc.
+        )
+
+        if (
+            wire_one in wires_ and wire_two in wires_
+        ):  # base case where no further DFS recursion is required
+            wire_one, wire_two = wires_[wire_one], wires_[wire_two]
+            result = op(wire_one, wire_two)
+            gates_[gate_name] = result
+            wires_[gate_name] = result
+            return result
+        if wire_one not in wires_ and wire_two not in wires_:
+            return op(recurse_compute_op(wire_one, gates_, wires_), recurse_compute_op(wire_two, gates_, wires_))
+        if wire_one in wires_ and wire_two not in wires_:
+            return op(wires_[wire_one], recurse_compute_op(wire_two, gates_, wires_))
+        if wire_one not in wires_ and wire_two in wires_:
+            return op(recurse_compute_op(wire_one, gates_, wires_), wires_[wire_two])
+
+    unique_gates = set(gates_)
+
+    # perform the swap
+    for swap1 in tqdm(combinations(unique_gates, 2), total=len(unique_gates)*(len(unique_gates)-1)/2):
+        for swap2 in combinations(unique_gates - set(swap1), 2):
+            for swap3 in combinations(unique_gates - set(swap1)-set(swap2), 2):
+                for swap4 in combinations(unique_gates - set(swap1)-set(swap2)-set(swap3), 2):
+                    gates = gates_.copy()
+                    wires=wires_.copy()
+
+                    a, b = swap1
+                    c, d = swap2
+                    e,f=swap3
+                    g,h=swap4
+                    op_a, op_b, op_c, op_d,op_e,op_f,op_g,op_h= gates[a], gates[b], gates[c], gates[d], gates[e], gates[f], gates[g], gates[h]
+                    gates[b] = op_a
+                    gates[a] = op_b
+                    
+                    gates[c] = op_d
+                    gates[d] = op_c
+                    
+                    gates[e] = op_f
+                    gates[f] = op_e
+                    
+                    gates[g] = op_h
+                    gates[h] = op_g
+                    # compute the values of all z\d+ gates
+                    for gate_name, gate_op in gates.items():
+                        if gate_name.startswith(
+                            "z"
+                        ):  # had some gate names been like 'ztw', I'd have used a ^z\d+$ REGEX pattern
+                            try:
+                                gates[gate_name] = recurse_compute_op(gate_name, gates, wires)
+                            except RecursionError:
+                                break
+                    try:
+                        # check x + y correctness
+                        only_z_gates = {k: v for k, v in gates.items() if k.startswith("z")}
+                        z = int(
+                            "".join(str(elem[1]) for elem in sorted(only_z_gates.items()))[::-1],
+                            base=2,
+                        )
+
+                        only_x_gates = {k: v for k, v in wires.items() if k.startswith("x")}
+                        x = int(
+                            "".join(str(elem[1]) for elem in sorted(only_x_gates.items()))[::-1],
+                            base=2,
+                        )
+
+                        only_y_gates = {k: v for k, v in wires.items() if k.startswith("y")}
+                        y = int(
+                            "".join(str(elem[1]) for elem in sorted(only_y_gates.items()))[::-1],
+                            base=2,
+                        )
+
+                        if op(x, y) == z:
+                            ans = ",".join([a, b, c, d,e,f,g,h, b, a, d, c,f,e,h,g])
+
+                            print(f"Part 2: {ans}")
+                            return ans
+                    except:
+                        continue
+
+
 if __name__ == "__main__":
-    solve_p1(mini)
-    assert solve_p1(mini) == 1
-    assert solve_p1(example_small) == 4
-    assert solve_p1(example_medium) == 2024
-    solve_p1(actual)
+    # solve_p1(mini)
+    # assert solve_p1(mini) == 1
+    # assert solve_p1(example_small) == 4
+    # assert solve_p1(example_medium) == 2024
+    # solve_p1(actual)
+    solve_p2(actual, int.__add__)
