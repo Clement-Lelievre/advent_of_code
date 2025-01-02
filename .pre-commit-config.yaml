@@ -21,3 +21,14 @@ repos:
         args: [ --fix ]
     # Run the formatter.
     -   id: ruff-format
+-   repo: https://github.com/econchick/interrogate
+    rev: 1.7.0
+    hooks:
+      - id: interrogate
+        exclude: ^(docs/conf.py|setup.py|tests/functional/sample)
+        args: [--quiet, --fail-under=50]
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v3.19.1
+    hooks:
+    -   id: pyupgrade
+        args: [--py39-plus]
