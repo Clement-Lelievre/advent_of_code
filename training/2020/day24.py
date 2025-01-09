@@ -1,6 +1,7 @@
 """https://adventofcode.com/2020/day/24"""
 
-from collections import defaultdict
+from collections import defaultdict, Counter
+import re
 
 
 example = """sesenwnenenewseeswwswswwnenewsewsw
@@ -457,22 +458,9 @@ def solve(inp: str) -> int:
     return ans
 
 
-def navigate(line: str) -> defaultdict[str, int]:
+def navigate(line: str) -> Counter[str, int]:
     DIRS = {"e", "w", "nw", "ne", "se", "sw"}
-    c = 0
-    line = line.strip()
-    path = defaultdict(int)
-    while c < len(line):
-        if line[c : c + 1] in DIRS:
-            path[line[c : c + 1]] += 1
-            c += 1
-        elif line[c : c + 2] in DIRS:
-            path[line[c : c + 2]] += 1
-            c += 2
-        else:
-            raise ValueError
-    assert 1 <= len(path) <= len(DIRS)
-    return path
+    return Counter(re.findall(pattern="|".join(DIRS), string=line))
 
 
 def reduce_path(path: defaultdict[str, int]) -> tuple[str]:
