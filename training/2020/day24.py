@@ -491,12 +491,12 @@ def reduce_path(path: defaultdict[str, int]) -> tuple[str]:
             path[b] -= 1
             path[replacement] += 1
         # reduce path
-        trio_cancelling_out_pairs = [("e", "nw", "sw"), ("w", "se", "ne")]
-        for a, b, c in trio_cancelling_out_pairs:
-            min_ = min(path[a], path[b], path[c])
-            path[a] -= min_
-            path[b] -= min_
-            path[c] -= min_
+        # trio_cancelling_out_pairs = [("e", "nw", "sw"), ("w", "se", "ne")]
+        # for a, b, c in trio_cancelling_out_pairs:
+        #     min_ = min(path[a], path[b], path[c])
+        #     path[a] -= min_
+        #     path[b] -= min_
+        #     path[c] -= min_
 
         duo_cancelling_out_pairs = [("e", "w"), ("nw", "se"), ("sw", "ne")]
         for a, b in duo_cancelling_out_pairs:
