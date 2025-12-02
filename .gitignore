@@ -46,3 +46,4 @@ db.sqlite3-journal
 # IPython
 profile_default/
 ipython_config.py
+*data*
