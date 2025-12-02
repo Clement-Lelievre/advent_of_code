@@ -34,6 +34,22 @@ def solve_p2(inp: str) -> int:
     return ans
 
 
+def solve_p2_alternate(inp: str) -> int:
+    ans = 0
+    for r in inp.split(","):
+        start, end = r.split("-")
+        for nb in range(int(start), int(end) + 1):
+            s = str(nb)
+            for k in range(1, len(str(nb)) // 2 + 1):
+                if len(s) % k:
+                    continue
+                if s == s[:k] * (len(s) // k):
+                    ans += int(nb)
+                    break
+    print(ans)
+    return ans
+
+
 if __name__ == "__main__":
     assert solve(example) == 1227775554
     with open("data/day2.txt", "r") as f:
@@ -43,3 +59,4 @@ if __name__ == "__main__":
     assert (s := solve_p2(example)) == 4_174_379_265, s
     with open("data/day2.txt", "r") as f:
         solve_p2(f.read())
+        solve_p2_alternate(f.read())
