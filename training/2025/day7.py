@@ -1,5 +1,4 @@
 import numpy as np
-from copy import deepcopy
 
 example = """
 .......S.......
@@ -74,8 +73,9 @@ def p2(inp: str) -> int:
             # pprint_arr(grid)
             return
         for k in (beam_col + 1, beam_col - 1):
-            new = deepcopy(grid[beam_row + j :])
-            new[0][k] = "|"
+            row = grid[beam_row + j][:k] + ["|"] + grid[beam_row + j][k + 1 :]
+            new = [row]
+            new.extend(grid[beam_row + j + 1 :])
             recurse(new)
 
     recurse(arr[1:])
