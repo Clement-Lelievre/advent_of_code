@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 
 example = """
 .......S.......
@@ -23,6 +24,7 @@ example = """
 def pprint_arr(arr) -> None:
     for row in arr:
         print(*row)
+    print("\n")
 
 
 def p1(inp: str) -> int:
@@ -52,6 +54,37 @@ def p1(inp: str) -> int:
     return nb_splits
 
 
+def p2(inp: str) -> int:
+    nb_paths = 0
+    arr = [list(row) for row in inp.splitlines() if row.strip()]
+    # create the first beam
+    s_ind = arr[0].index("S")
+    arr[1][s_ind] = "|"
+
+    def recurse(grid):
+        nonlocal nb_paths
+        # pprint_arr(grid)
+        beam_row = 0
+        beam_col = grid[beam_row].index("|")
+        j = 1
+        while beam_row + j < len(grid) and grid[beam_row + j][beam_col] == ".":
+            j += 1
+        if beam_row + j == len(grid):
+            nb_paths += 1
+            # pprint_arr(grid)
+            return
+        for k in (beam_col + 1, beam_col - 1):
+            new = deepcopy(grid[beam_row + j :])
+            new[0][k] = "|"
+            recurse(new)
+
+    recurse(arr[1:])
+    print(nb_paths)
+    return nb_paths
+
+
 if __name__ == "__main__":
     assert p1(example) == 21
     p1(open("data/day7.txt", "r").read())
+    assert (ans := p2(example)) == 40, ans
+    p2(open("data/day7.txt", "r").read())
