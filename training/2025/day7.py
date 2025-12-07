@@ -1,4 +1,5 @@
 import numpy as np
+from collections import namedtuple, defaultdict
 
 example = """
 .......S.......
@@ -53,38 +54,39 @@ def p1(inp: str) -> int:
     return nb_splits
 
 
+Point = namedtuple("Point", ["x", "y"])
+
+
 def p2(inp: str) -> int:
-    nb_paths = 0
     arr = [list(row) for row in inp.splitlines() if row.strip()]
-    # create the first beam
     s_ind = arr[0].index("S")
-    arr[1][s_ind] = "|"
+    nb_rows = len(arr)
+    visited: defaultdict[Point, int] = defaultdict(int)
 
-    def recurse(grid):
-        nonlocal nb_paths
-        # pprint_arr(grid)
-        beam_row = 0
-        beam_col = grid[beam_row].index("|")
-        j = 1
-        while beam_row + j < len(grid) and grid[beam_row + j][beam_col] == ".":
-            j += 1
-        if beam_row + j == len(grid):
-            nb_paths += 1
-            # pprint_arr(grid)
-            return
-        for k in (beam_col + 1, beam_col - 1):
-            row = grid[beam_row + j][:k] + ["|"] + grid[beam_row + j][k + 1 :]
-            new = [row]
-            new.extend(grid[beam_row + j + 1 :])
-            recurse(new)
+    def nb_paths_till_bottom(from_: Point) -> int:
+        if from_.x == nb_rows:
+            return 1
+        if from_ in visited:
+            return visited[from_]
 
-    recurse(arr[1:])
-    print(nb_paths)
-    return nb_paths
+        i = 1
+        while from_.x + i < nb_rows and arr[from_.x + i][from_.y] != "^":
+            i += 1
+        if from_.x + i == nb_rows:
+            return 1
+
+        left = nb_paths_till_bottom(Point(from_.x + i, from_.y - 1))
+        right = nb_paths_till_bottom(Point(from_.x + i, from_.y + 1))
+        visited[from_] = left + right
+        return visited[from_]
+
+    ans = nb_paths_till_bottom(from_=Point(0, s_ind))
+    print(ans)
+    return ans
 
 
 if __name__ == "__main__":
     assert p1(example) == 21
     p1(open("data/day7.txt", "r").read())
-    assert (ans := p2(example)) == 40, ans
+    assert (example_ans := p2(example)) == 40, example_ans
     p2(open("data/day7.txt", "r").read())
